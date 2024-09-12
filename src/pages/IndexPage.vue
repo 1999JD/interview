@@ -4,7 +4,9 @@
       <div class="q-mb-xl">
         <q-input v-model="tempData.name" label="姓名" />
         <q-input v-model="tempData.age" label="年齡" />
-        <q-btn color="primary" class="q-mt-md">新增</q-btn>
+        <q-btn color="primary" class="q-mt-md" @click="handleAddPeople">
+          新增
+        </q-btn>
       </div>
 
       <q-table
@@ -79,13 +81,23 @@
 
 <script setup lang="ts">
 import axios from 'axios';
-import { QTableProps } from 'quasar';
-import { ref } from 'vue';
+import { QTableProps, useQuasar } from 'quasar';
+import { ref, onMounted } from 'vue';
+import editDialog from 'src/components/indexpage/editDialog.vue';
 interface btnType {
   label: string;
   icon: string;
   status: string;
 }
+
+interface EditPersonType {
+  id?: string;
+  name: string;
+  age: number;
+}
+
+const $q = useQuasar();
+
 const blockData = ref([
   {
     name: 'test',
@@ -123,9 +135,112 @@ const tempData = ref({
   name: '',
   age: '',
 });
-function handleClickOption(btn, data) {
-  // ...
+
+const api = axios.create({
+  baseURL: 'https://dahua.metcfire.com.tw/',
+});
+
+// 集中管理 api endpoint 、 資料格式
+const getPeople = async () => {
+  return api.get('/api/CRUDTest/a');
+};
+
+const addPeople = async (data: EditPersonType) => {
+  return api.post('/api/CRUDTest', data);
+};
+
+const updatePeople = async (data: EditPersonType) => {
+  return api.patch('/api/CRUDTest', data);
+};
+
+const deletePeople = async (id: string) => {
+  return api.delete(`/api/CRUDTest/${id}`);
+};
+
+// 處理頁面對 api 的操作及 ui 邏輯
+const handleGetPeople = async () => {
+  try {
+    const response = await getPeople();
+    blockData.value = response.data;
+  } catch (err) {
+    alert(err);
+  }
+};
+
+const handleAddPeople = async () => {
+  try {
+    const data = {
+      name: tempData.value.name,
+      age: Number(tempData.value.age),
+    };
+
+    await addPeople(data);
+    tempData.value.name = '';
+    tempData.value.age = '';
+    handleGetPeople();
+  } catch (err) {
+    alert(err);
+  }
+};
+
+const handleUpdatePeople = async (data: EditPersonType) => {
+  try {
+    await updatePeople(data);
+    handleGetPeople();
+  } catch (err) {
+    alert(err);
+  }
+};
+
+const handleDeletePeople = async (id: string) => {
+  try {
+    await deletePeople(id);
+    handleGetPeople();
+  } catch (err) {
+    alert(err);
+  }
+};
+
+function handleClickOption(
+  btn: btnType,
+  data: {
+    id: string;
+    name: string;
+    age: number;
+  }
+) {
+  if (btn.status === 'edit') {
+    $q.dialog({
+      component: editDialog,
+
+      // props forwarded to your custom component
+      componentProps: {
+        name: data.name,
+        age: Number(data.age),
+        id: data.id,
+        api: api,
+        // ...more..props...
+      },
+    }).onOk((data) => {
+      console.log(data);
+      handleUpdatePeople(data);
+      console.log('OK');
+    });
+  } else if (btn.status === 'delete') {
+    $q.dialog({
+      title: 'Confirm',
+      message: '您確定要刪除此項目?',
+      cancel: true,
+      persistent: true,
+    }).onOk(() => {
+      handleDeletePeople(data.id);
+    });
+  }
 }
+
+onMounted(() => {
+  handleGetPeople();
+});
 </script>
 
 <style lang="scss" scoped>
